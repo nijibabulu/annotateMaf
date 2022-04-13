@@ -63,25 +63,32 @@ future::plan(future::multisession)
 
 #' @export
 #' @rdname oncokb_annotate_maf
-query_oncokb = function(gene, protein_change, variant_type, start, end, cancer_type = 'CANCER') {
+query_oncokb = function(api_token, gene, protein_change, variant_type, cancer_type = 'CANCER') {
 
   if (variant_type != '') {
 
-    base_url = 'http://oncokb.org/legacy-api/indicator.json?source=cbioportal'
-    oncokb_version = httr::content(httr::GET(base_url))[['dataVersion']]
+    base_url = 'https://www.oncokb.org/api/v1/'
+    info_url = paste0(base_url, "info")
+    query_base_url = paste0(base_url, "annotate/mutations/byProteinChange")
+    if(!exists('oncokb_version')) {
+      oncokb_version <<- httr::content(httr::GET(info_url))$dataVersion$version
+    }
     tag = paste(gene, protein_change, cancer_type, sep = '-')
 
     if (!exists('cached_entries')) cached_entries <<- vector(mode = 'list')
 
     if (!tag %in% names(cached_entries)) {
-        query_url = httr::modify_url(base_url, query = list(
+        query_url = httr::modify_url(query_base_url, query = list(
             hugoSymbol = gene,
             alteration = protein_change,
             consequence = variant_type,
             tumorType = cancer_type
         ))
 
-        oncokb_response = httr::GET(query_url)
+        headers <- httr::add_headers(Authorization = stringr::str_c("Bearer ", token),
+                                     accept = "application/json")
+
+        oncokb_response = httr::GET(query_url, headers)
         oncokb_response = httr::content(oncokb_response)
         
         cached_entries[[tag]] = oncokb_response
@@ -95,6 +102,8 @@ query_oncokb = function(gene, protein_change, variant_type, start, end, cancer_t
         unique()
 
     tibble::tibble(oncogenic = as.character(oncokb_response$oncogenic),
+                   oncokb_effect = ifelse(is.null(oncokb_response$mutationEffect$knownEffect), '',
+                                          oncokb_response$mutationEffect$knownEffect),
                    oncokb_level = ifelse(is.null(oncokb_response$highestSensitiveLevel), '',
                                          oncokb_response$highestSensitiveLevel),
                    oncokb_resistance_level = ifelse(is.null(oncokb_response$highestResistanceLevel), '',
@@ -109,7 +118,7 @@ query_oncokb = function(gene, protein_change, variant_type, start, end, cancer_t
 
 #' @export
 #' @rdname oncokb_annotate_maf
-oncokb_annotate_maf = function(maf, cancer_types = NULL, parallelize = TRUE)
+oncokb_annotate_maf = function(api_token, maf, cancer_types = NULL, parallelize = TRUE)
 {
     if (is.null(cancer_types) & !'cancer_type' %in% names(maf)) {
         message('No cancer types(s) specified, defaults to CANCER')
@@ -121,6 +130,7 @@ oncokb_annotate_maf = function(maf, cancer_types = NULL, parallelize = TRUE)
     }
 
     oncokb_cols = mutate(maf,
+           api_token = api_token,
            gene = Hugo_Symbol,
            protein_change = stringr::str_replace(HGVSp_Short, 'p.', ''),
            variant_type = dplyr::case_when(
@@ -132,8 +142,8 @@ oncokb_annotate_maf = function(maf, cancer_types = NULL, parallelize = TRUE)
            start = stringr::str_extract(Protein_position, '^[0-9]+(?=\\/|\\-)'),
            end = stringr::str_extract(Protein_position, '(?<=-)[0-9]+(?=/)')
            ) %>%
-        dplyr::select(gene, protein_change, variant_type, start, end, cancer_type)
     
+        dplyr::select(gene, protein_change, variant_type, cancer_type)
     if (parallelize == TRUE) {
         oncokb_cols = furrr::future_pmap_dfr(oncokb_cols, query_oncokb)
     } else {
