@@ -2,6 +2,7 @@
 #'
 #' Adds OncoKB oncogenicity and actionability annotation to VEP-annotated MAF. See URLs below.
 #'
+#' @param api_token OncoKB API token. This can be retrieved from https://www.oncokb.org/account/settings after you have set up your account.
 #' @param maf Input MAF.
 #' @param cancer_types Data frame with samples mapped to cancer type for accurate levels of actionability.
 #' 
