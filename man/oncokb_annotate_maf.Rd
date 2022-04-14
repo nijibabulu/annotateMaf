@@ -10,21 +10,24 @@
 \url{github.com/oncokb/oncokb-annotator}
 }
 \usage{
-query_oncokb(gene, protein_change, variant_type, start, end,
-  cancer_type = "CANCER")
+query_oncokb(
+  api_token,
+  gene,
+  protein_change,
+  variant_type,
+  cancer_type = "CANCER"
+)
 
-oncokb_annotate_maf(maf, cancer_types = NULL, parallelize = TRUE)
+oncokb_annotate_maf(api_token, maf, cancer_types = NULL, parallelize = TRUE)
 }
 \arguments{
+\item{api_token}{OncoKB API token. This can be retrieved from https://www.oncokb.org/account/settings after you have set up your account.}
+
 \item{gene}{Gene.}
 
 \item{protein_change}{Abbreviated form, e.g. "H1047R".}
 
 \item{variant_type}{Lower case variant type, e.g. "missense".}
-
-\item{start}{Genomic start position of variant.}
-
-\item{end}{Genomic end position of variant.}
 
 \item{cancer_type}{Oncotree code for cancer type. Can be left blank.}
 
@@ -33,6 +36,10 @@ oncokb_annotate_maf(maf, cancer_types = NULL, parallelize = TRUE)
 \item{cancer_types}{Data frame with samples mapped to cancer type for accurate levels of actionability.}
 
 \item{parallelize}{Boolean indicating whether to parallelize annotation, using \code{future} backend.}
+
+\item{start}{Genomic start position of variant.}
+
+\item{end}{Genomic end position of variant.}
 }
 \value{
 Annotated MAF with columns indicating functionality of mutation and levels of actionability.
