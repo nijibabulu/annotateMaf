@@ -86,7 +86,7 @@ query_oncokb = function(api_token, gene, protein_change, variant_type, cancer_ty
             tumorType = cancer_type
         ))
 
-        headers <- httr::add_headers(Authorization = stringr::str_c("Bearer ", token),
+        headers <- httr::add_headers(Authorization = stringr::str_c("Bearer ", api_token),
                                      accept = "application/json")
 
         oncokb_response = httr::GET(query_url, headers)
