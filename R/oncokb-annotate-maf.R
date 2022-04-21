@@ -64,6 +64,7 @@ future::plan(future::multisession)
 
 #' @export
 #' @rdname oncokb_annotate_maf
+#TODO: some results such as KIT D816Y, work correctly with mquery but not here.
 query_oncokb = function(api_token, gene, protein_change, variant_type, cancer_type = 'CANCER') {
 
   if (variant_type != '') {
@@ -76,6 +77,13 @@ query_oncokb = function(api_token, gene, protein_change, variant_type, cancer_ty
     }
     tag = paste(gene, protein_change, cancer_type, sep = '-')
 
+    evidence_types <- stringr::str_c(
+      c("ONCOGENIC", "MUTATION_EFFECT",
+        "STANDARD_THERAPEUTIC_IMPLICATIONS_FOR_DRUG_SENSITIVITY",
+        "INVESTIGATIONAL_THERAPEUTIC_IMPLICATIONS_DRUG_SENSITIVITY",
+        "INVESTIGATIONAL_THERAPEUTIC_IMPLICATIONS_DRUG_RESISTANCE"),
+      collapse = ",")
+
     if (!exists('cached_entries')) cached_entries <<- vector(mode = 'list')
 
     if (!tag %in% names(cached_entries)) {
@@ -83,13 +91,23 @@ query_oncokb = function(api_token, gene, protein_change, variant_type, cancer_ty
             hugoSymbol = gene,
             alteration = protein_change,
             consequence = variant_type,
-            tumorType = cancer_type
+            tumorType = cancer_type,
+            evidenceType = evidence_types
         ))
+        cat(query_url)
 
         headers <- httr::add_headers(Authorization = stringr::str_c("Bearer ", api_token),
                                      accept = "application/json")
 
         oncokb_response = httr::GET(query_url, headers)
+
+        if(oncokb_response$headers$`content-type` == "application/problem+json") {
+          json <- httr::content(oncokb_response, "text", "application/json")
+          errmsg <- stringr::str_c("Problem querying oncokb:\n",
+                                   jsonlite::prettify(json))
+          rlang::abort(errmsg)
+        }
+
         oncokb_response = httr::content(oncokb_response)
         
         cached_entries[[tag]] = oncokb_response
