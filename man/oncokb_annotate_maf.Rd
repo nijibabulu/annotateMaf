@@ -3,6 +3,7 @@
 \name{oncokb_annotate_maf}
 \alias{oncokb_annotate_maf}
 \alias{query_oncokb}
+\alias{mquery_oncokb}
 \title{Annotate OncoKB levels of evidence}
 \source{
 \url{oncokb.org}
@@ -11,6 +12,14 @@
 }
 \usage{
 query_oncokb(
+  api_token,
+  gene,
+  protein_change,
+  variant_type,
+  cancer_type = "CANCER"
+)
+
+mquery_oncokb(
   api_token,
   gene,
   protein_change,

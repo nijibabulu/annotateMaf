@@ -2,6 +2,7 @@
 
 export(brca_annotate_maf)
 export(hotspot_annotate_maf)
+export(mquery_oncokb)
 export(oncokb_annotate_maf)
 export(query_brca_exchange)
 export(query_oncokb)
