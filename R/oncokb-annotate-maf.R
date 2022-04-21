@@ -135,6 +135,8 @@ query_oncokb = function(api_token, gene, protein_change, variant_type, cancer_ty
   }
 }
 
+#' @export
+#' @rdname oncokb_annotate_maf
 mquery_oncokb = function(api_token, gene, protein_change, variant_type, cancer_type = 'CANCER') {
 
   if (any(variant_type != '')) {
