@@ -135,6 +135,71 @@ query_oncokb = function(api_token, gene, protein_change, variant_type, cancer_ty
   }
 }
 
+mquery_oncokb = function(api_token, gene, protein_change, variant_type, cancer_type = 'CANCER') {
+
+  if (any(variant_type != '')) {
+
+    base_url = 'https://www.oncokb.org/api/v1/'
+    info_url = paste0(base_url, "info")
+    query_url = paste0(base_url, "annotate/mutations/byProteinChange")
+    if(!exists('oncokb_version')) {
+      oncokb_version <<- httr::content(httr::GET(info_url))$dataVersion$version
+    }
+
+    query_base <- list(tumor_type = cancer_type,
+                       evidenceTypes = list("ONCOGENIC", "MUTATION_EFFECT",
+                                            "STANDARD_THERAPEUTIC_IMPLICATIONS_FOR_DRUG_SENSITIVITY",
+                                            "INVESTIGATIONAL_THERAPEUTIC_IMPLICATIONS_DRUG_SENSITIVITY",
+                                            "INVESTIGATIONAL_THERAPEUTIC_IMPLICATIONS_DRUG_RESISTANCE"))
+    query_inputs <- list(gene, protein_change, variant_type)
+    body_structure <-  purrr::pmap(
+      query_inputs,
+      ~c(query_base,  list(gene = list(hugoSymbol = ..1),
+                           alteration = ..2, consequence = ..3)))
+    body <- jsonlite::toJSON(body_structure, auto_unbox = TRUE)
+
+    headers <- c(
+      httr::accept_json(),  httr::content_type_json(),
+      httr::add_headers(Authorization = stringr::str_c("Bearer ", api_token)))
+
+    oncokb_response = httr::POST(query_url, headers, body = body)
+
+    if(oncokb_response$headers$`content-type` == "application/problem+json") {
+      json <- httr::content(oncokb_response, "text", "application/json")
+      errmsg <- stringr::str_c("Problem querying oncokb:\n",
+                               jsonlite::prettify(json))
+      rlang::abort(errmsg)
+    }
+
+    oncokb_response = httr::content(oncokb_response)
+
+
+    purrr::map_dfr(oncokb_response,
+                   ~{
+                     drugs = purrr::map(.x$treatments, 'drugs') %>%
+                       purrr::map(., function(x) paste(unlist(x))) %>%
+                       purrr::simplify() %>%
+                       unique()
+
+                     tibble::tibble(
+                       oncogenic = as.character(.x$oncogenic),
+                       oncokb_effect = ifelse(is.null(.x$mutationEffect$knownEffect), '',
+                                              .x$mutationEffect$knownEffect),
+                       oncokb_level = ifelse(is.null(.x$highestSensitiveLevel), '',
+                                             .x$highestSensitiveLevel),
+                       oncokb_resistance_level = ifelse(is.null(.x$highestResistanceLevel), '',
+                                                        .x$highestResistanceLevel),
+                       oncokb_drugs = ifelse(length(drugs) == 0, '',
+                                             paste(unlist(unique(drugs)), collapse = ',')),
+                       oncokb_version = oncokb_version)
+                   })
+
+
+  } else {
+    tibble::tibble(oncogenic = '')
+  }
+}
+
 #' @export
 #' @rdname oncokb_annotate_maf
 oncokb_annotate_maf = function(api_token, maf, cancer_types = NULL, parallelize = TRUE)
