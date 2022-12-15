@@ -4,7 +4,11 @@
 \alias{hotspot_annotate_maf}
 \title{Annotate somatic hotspot mutations}
 \usage{
-hotspot_annotate_maf(maf, hotspot_tbl = NULL)
+hotspot_annotate_maf(
+  maf,
+  oncokbbaseurl = "https://legacy.oncokb.org/api/v1/genes",
+  hotspot_tbl = NULL
+)
 }
 \arguments{
 \item{maf}{Input MAF.}

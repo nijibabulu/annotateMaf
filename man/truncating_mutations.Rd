@@ -4,7 +4,9 @@
 \name{truncating_mutations}
 \alias{truncating_mutations}
 \title{Variant classification of truncating mutations}
-\format{List of variants considered protein truncating, by VEP variant class labels.}
+\format{
+List of variants considered protein truncating, by VEP variant class labels.
+}
 \usage{
 truncating_mutations
 }

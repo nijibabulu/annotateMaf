@@ -4,7 +4,9 @@
 \name{coding_mutations}
 \alias{coding_mutations}
 \title{Variant classification of coding mutations}
-\format{List of variants considered coding, by VEP variant class labels.}
+\format{
+List of variants considered coding, by VEP variant class labels.
+}
 \usage{
 coding_mutations
 }

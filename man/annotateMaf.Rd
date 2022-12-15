@@ -3,7 +3,6 @@
 \docType{package}
 \name{annotateMaf}
 \alias{annotateMaf}
-\alias{annotateMaf-package}
 \title{\code{annotateMaf} package}
 \description{
 Variant-level annotation for `data.frame`s in MAF format.

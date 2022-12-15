@@ -4,7 +4,11 @@
 \name{brca_exchange_variants}
 \alias{brca_exchange_variants}
 \title{BRCA exchange variants}
-\format{Table of annotated BRCA1/2 variants in BRCA exchange database.}
+\format{
+Table of annotated BRCA1/2 variants in BRCA exchange database.
+
+Germline variants in BRCA1/2 with annotation in BRCA Exchange.
+}
 \source{
 \url{http://brcaexchange.org}
 
