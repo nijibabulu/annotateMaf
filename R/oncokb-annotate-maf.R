@@ -48,6 +48,9 @@ consequence_map = c('3\'Flank' = 'any',
                     'Splice_Region' = 'splice_region_variant',
                     'Translation_Start_Site' = 'start_lost')
 
+
+cnv_consequences = c("amplification", "deletion", "gain", "loss")
+
 coding_mutations = c('Frame_Shift_Del',
                      'Frame_Shift_Ins',
                      'In_Frame_Del',
@@ -160,8 +163,7 @@ mquery_oncokb = function(api_token, gene, protein_change, variant_type, cancer_t
                      ~{
                        if(verbose) pb$tick()
                        mquery_oncokb_chunk(api_token, gene[.x], protein_change[.x],
-                                           variant_type[.x], cancer_type,
-                                           shortened_query = shorten_query)
+                                           variant_type[.x], cancer_type)
                      })
     pb$terminate()
     res
@@ -170,11 +172,21 @@ mquery_oncokb = function(api_token, gene, protein_change, variant_type, cancer_t
   }
 }
 
-mquery_oncokb_chunk = function(api_token, gene, protein_change, variant_type, cancer_type = 'CANCER',
-                               shortened_query = F) {
+check_response <- function(response) {
+ if(response$headers$`content-type` == "application/problem+json") {
+    json <- httr::content(response, "text", "application/json")
+    errmsg <- stringr::str_c("Problem querying oncokb:\n",
+                             jsonlite::prettify(json))
+    rlang::abort(errmsg)
+  }
+
+}
+
+mquery_oncokb_chunk = function(api_token, gene, protein_change, variant_type, cancer_type = 'CANCER') {
   base_url = 'https://www.oncokb.org/api/v1/'
   info_url = paste0(base_url, "info")
-  query_url = paste0(base_url, "annotate/mutations/byProteinChange")
+  query_alt_url = paste0(base_url, "annotate/mutations/byProteinChange")
+  query_cnv_url = paste0(base_url, "annotate/copyNumberAlterations")
   if(!exists('oncokb_version')) {
     oncokb_version <<- httr::content(httr::GET(info_url))$dataVersion$version
   }
@@ -184,27 +196,33 @@ mquery_oncokb_chunk = function(api_token, gene, protein_change, variant_type, ca
                                           "STANDARD_THERAPEUTIC_IMPLICATIONS_FOR_DRUG_SENSITIVITY",
                                           "INVESTIGATIONAL_THERAPEUTIC_IMPLICATIONS_DRUG_SENSITIVITY",
                                           "INVESTIGATIONAL_THERAPEUTIC_IMPLICATIONS_DRUG_RESISTANCE"))
-  query_inputs <- list(gene, protein_change, variant_type)
-  body_structure <-  purrr::pmap(
-    query_inputs,
+  query_inputs <- tibble::tibble(gene, protein_change, variant_type)
+
+  alt_body_structure <-  purrr::pmap(
+    query_inputs %>% dplyr::filter(!tolower(variant_type) %in% cnv_consequences),
     ~c(query_base,  list(gene = list(hugoSymbol = ..1),
                          alteration = ..2, consequence = ..3)))
-  body <- jsonlite::toJSON(body_structure, auto_unbox = TRUE)
+  alt_body <- jsonlite::toJSON(alt_body_structure, auto_unbox = TRUE)
+
+  cnv_body_structure <-  purrr::pmap(
+    query_inputs %>% dplyr::filter(tolower(variant_type) %in% cnv_consequences),
+    ~c(query_base,  list(gene = list(hugoSymbol = ..1),
+                         copyNameAlterationType = toupper(..3))))
+  cnv_body <- jsonlite::toJSON(cnv_body_structure, auto_unbox = TRUE)
+
 
   headers <- c(
     httr::accept_json(),  httr::content_type_json(),
     httr::add_headers(Authorization = stringr::str_c("Bearer ", api_token)))
 
-  oncokb_response = httr::POST(query_url, headers, body = body)
+  alt_oncokb_response = httr::POST(query_alt_url, headers, body = alt_body)
+  cnv_oncokb_response = httr::POST(query_cnv_url, headers, body = cnv_body)
 
-  if(oncokb_response$headers$`content-type` == "application/problem+json") {
-    json <- httr::content(oncokb_response, "text", "application/json")
-    errmsg <- stringr::str_c("Problem querying oncokb:\n",
-                             jsonlite::prettify(json))
-    rlang::abort(errmsg)
-  }
+  check_response(alt_oncokb_response)
+  check_response(cnv_oncokb_response)
 
-  oncokb_response = httr::content(oncokb_response)
+  oncokb_response = c(httr::content(alt_oncokb_response),
+                      httr::content(cnv_oncokb_response))
 
 
   purrr::map_dfr(seq_along(oncokb_response),
@@ -215,27 +233,20 @@ mquery_oncokb_chunk = function(api_token, gene, protein_change, variant_type, ca
                      purrr::simplify() %>%
                      unique()
 
-                   res <-
-                     tibble::tibble(
-                       oncogenic = as.character(r$oncogenic),
-                       oncokb_effect = ifelse(is.null(r$mutationEffect$knownEffect), '',
-                                              r$mutationEffect$knownEffect),
-                       oncokb_level = ifelse(is.null(r$highestSensitiveLevel), '',
-                                             r$highestSensitiveLevel),
-                       oncokb_resistance_level = ifelse(is.null(r$highestResistanceLevel), '',
-                                                        r$highestResistanceLevel),
-                       oncokb_drugs = ifelse(length(drugs) == 0, '',
-                                             paste(unlist(unique(drugs)), collapse = ',')),
-                       oncokb_version = oncokb_version)
-                   if(shortened_query) {
-                     res <- dplyr::bind_cols(
-                       tibble::tibble(hugoSymbol = gene[.x],
-                                      alteration = protein_change[.x],
-                                      consequence = variant_type[.x]),
-                       res
-                     )
-                   }
-                   res
+                   tibble::tibble(
+                     hugoSymbol = gene[.x],
+                     alteration = protein_change[.x],
+                     consequence = variant_type[.x],
+                     oncogenic = as.character(r$oncogenic),
+                     oncokb_effect = ifelse(is.null(r$mutationEffect$knownEffect), '',
+                                            r$mutationEffect$knownEffect),
+                     oncokb_level = ifelse(is.null(r$highestSensitiveLevel), '',
+                                           r$highestSensitiveLevel),
+                     oncokb_resistance_level = ifelse(is.null(r$highestResistanceLevel), '',
+                                                      r$highestResistanceLevel),
+                     oncokb_drugs = ifelse(length(drugs) == 0, '',
+                                           paste(unlist(unique(drugs)), collapse = ',')),
+                     oncokb_version = oncokb_version)
                  })
 }
 
